@@ -1820,6 +1820,29 @@ bool js::DisposeDisposablesOnScopeLeave(JSContext* cx,
 
 bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
                                                            RunState& state) {
+  uint32_t aggressiveGCCounter = 1;
+
+#define AGGRESSIVE_GC_PERIOD 20
+
+#define AGGRESSIVE_GC_FORCED() \
+      do { \
+        if (aggressiveGCCounter < AGGRESSIVE_GC_PERIOD) { \
+          aggressiveGCCounter = AGGRESSIVE_GC_PERIOD; \
+          auto allocator = ZoneAllocator::from(cx->zone()); \
+          checkAggressiveGC(allocator->mallocHeapSize.bytes() + allocator->jitHeapSize.bytes()); \
+        } \
+      } while (0)
+
+#define AGGRESSIVE_GC() \
+      do { \
+        aggressiveGCCounter--; \
+        if (aggressiveGCCounter == 0) { \
+          aggressiveGCCounter = AGGRESSIVE_GC_PERIOD; \
+          auto allocator = ZoneAllocator::from(cx->zone()); \
+          checkAggressiveGC(allocator->mallocHeapSize.bytes() + allocator->jitHeapSize.bytes()); \
+        } \
+      } while (0)
+
 /*
  * Define macros for an interpreter loop. Opcode dispatch is done by
  * indirect goto (aka a threaded interpreter), which is technically
@@ -1865,6 +1888,7 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
   JS_BEGIN_MACRO                                 \
     REGS.pc += (N);                              \
     SANITY_CHECKS();                             \
+    AGGRESSIVE_GC();                             \
     DISPATCH_TO(*REGS.pc | activation.opMask()); \
   JS_END_MACRO
 
@@ -3168,6 +3192,7 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
 
     CASE(Eval)
     CASE(StrictEval) {
+      AGGRESSIVE_GC_FORCED();
       static_assert(JSOpLength_Eval == JSOpLength_StrictEval,
                     "eval and stricteval must be the same size");
 
@@ -3233,6 +3258,7 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
     CASE(CallIter)
     CASE(CallContentIter)
     CASE(SuperCall) {
+      AGGRESSIVE_GC_FORCED();
       static_assert(JSOpLength_Call == JSOpLength_New,
                     "call and new must be the same size");
       static_assert(JSOpLength_Call == JSOpLength_CallContent,
@@ -3748,6 +3774,7 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
     END_CASE(GetActualArg)
 
     CASE(GlobalOrEvalDeclInstantiation) {
+      AGGRESSIVE_GC_FORCED();
       GCThingIndex lastFun = GET_GCTHING_INDEX(REGS.pc);
       HandleObject env = REGS.fp()->environmentChain();
       if (!GlobalOrEvalDeclInstantiation(cx, env, script, lastFun)) {
@@ -3757,6 +3784,7 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
     END_CASE(GlobalOrEvalDeclInstantiation)
 
     CASE(Lambda) {
+      AGGRESSIVE_GC_FORCED();
       /* Load the specified function object literal. */
       ReservedRooted<JSFunction*> fun(&rootFunction0,
                                       script->getFunction(REGS.pc));
@@ -3912,6 +3940,7 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
     END_CASE(Hole)
 
     CASE(NewInit) {
+      AGGRESSIVE_GC_FORCED();
       JSObject* obj = NewObjectOperation(cx, script, REGS.pc);
 
       if (!obj) {
@@ -3922,6 +3951,7 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
     END_CASE(NewInit)
 
     CASE(NewArray) {
+      AGGRESSIVE_GC_FORCED();
       uint32_t length = GET_UINT32(REGS.pc);
       ArrayObject* obj = NewArrayOperation(cx, length);
       if (!obj) {
@@ -3932,6 +3962,7 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
     END_CASE(NewArray)
 
     CASE(NewObject) {
+      AGGRESSIVE_GC_FORCED();
       JSObject* obj = NewObjectOperation(cx, script, REGS.pc);
       if (!obj) {
         goto error;
@@ -4430,6 +4461,7 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
     END_CASE(FunWithProto)
 
     CASE(ObjWithProto) {
+      AGGRESSIVE_GC_FORCED();
       JSObject* obj = ObjectWithProtoOperation(cx, REGS.stackHandleAt(-1));
       if (!obj) {
         goto error;
@@ -4471,12 +4503,14 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
     END_CASE(SuperBase)
 
     CASE(NewTarget) {
+      AGGRESSIVE_GC_FORCED();
       PUSH_COPY(REGS.fp()->newTarget());
       MOZ_ASSERT(REGS.sp[-1].isObject() || REGS.sp[-1].isUndefined());
     }
     END_CASE(NewTarget)
 
     CASE(ImportMeta) {
+      AGGRESSIVE_GC_FORCED();
       JSObject* metaObject = ImportMetaOperation(cx, script);
       if (!metaObject) {
         goto error;
@@ -4487,6 +4521,7 @@ bool MOZ_NEVER_INLINE JS_HAZ_JSNATIVE_CALLER js::Interpret(JSContext* cx,
     END_CASE(ImportMeta)
 
     CASE(DynamicImport) {
+      AGGRESSIVE_GC_FORCED();
       ReservedRooted<Value> options(&rootValue0, REGS.sp[-1]);
       REGS.sp--;
 
@@ -5578,4 +5613,9 @@ bool js::CloseIterOperation(JSContext* cx, HandleObject iter,
 
   // Step 8
   return true;
+}
+
+size_t realHeapBytes(JSContext* cx) {
+  auto allocator = ZoneAllocator::from(cx->zone());
+  return allocator->mallocHeapSize.bytes() + allocator->jitHeapSize.bytes();
 }

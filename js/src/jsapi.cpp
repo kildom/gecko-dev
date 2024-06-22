@@ -1301,6 +1301,10 @@ JS_PUBLIC_API JS::GCReason JS::WantEagerMajorGC(JSRuntime* rt) {
   return rt->gc.wantMajorGC(true);
 }
 
+JS_PUBLIC_API bool JS::CheckIfGCAllowedInCurrentState(JSRuntime* rt) {
+  return rt->gc.checkIfGCAllowedInCurrentState(JS::GCReason::TOO_MUCH_MALLOC);
+}
+
 JS_PUBLIC_API void JS::MaybeRunNurseryCollection(JSRuntime* rt,
                                                  JS::GCReason reason) {
   gc::GCRuntime& gc = rt->gc;

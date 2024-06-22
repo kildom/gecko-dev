@@ -728,7 +728,9 @@ class GCRuntime {
 
   // Check if the system state is such that GC has been supressed
   // or otherwise delayed.
+public:
   [[nodiscard]] bool checkIfGCAllowedInCurrentState(JS::GCReason reason);
+private:
 
   gcstats::ZoneGCStats scanZonesBeforeGC();
 

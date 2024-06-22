@@ -1329,6 +1329,8 @@ extern JS_PUBLIC_API GCReason WantEagerMinorGC(JSRuntime* rt);
 
 extern JS_PUBLIC_API GCReason WantEagerMajorGC(JSRuntime* rt);
 
+extern JS_PUBLIC_API bool CheckIfGCAllowedInCurrentState(JSRuntime* rt);
+
 /**
  * Check whether the nursery should be eagerly collected as per WantEagerMajorGC
  * above, and if so run a collection.

@@ -396,8 +396,8 @@ def lto(
         ldflags.append("-mllvm:-import-instr-limit=10")
     elif target.kernel == "Darwin":
         ldflags.append("-Wl,-mllvm,-import-instr-limit=10")
-    elif c_compiler.type == "clang":
-        ldflags.append("-Wl,-plugin-opt=-import-instr-limit=10")
+    #elif c_compiler.type == "clang":
+    #    ldflags.append("-Wl,-plugin-opt=-import-instr-limit=10")
 
     # If we're using the new pass manager, we can also enable the new PM
     # during LTO. Further we can use the resulting size savings to increase
@@ -410,10 +410,10 @@ def lto(
                 ldflags.append("-mllvm:-import-hot-multiplier=30")
         elif target.kernel == "Darwin":
             ldflags.append("-Wl,-mllvm,-import-hot-multiplier=30")
-        else:
-            if c_compiler.version < "13.0.0":
-                ldflags.append("-Wl,-plugin-opt=new-pass-manager")
-            ldflags.append("-Wl,-plugin-opt=-import-hot-multiplier=30")
+        #else:
+        #    if c_compiler.version < "13.0.0":
+        #        ldflags.append("-Wl,-plugin-opt=new-pass-manager")
+        #   ldflags.append("-Wl,-plugin-opt=-import-hot-multiplier=30")
 
     # Pick Rust LTO mode in case of cross lTO. Thin is the default.
     if "cross" in values:
