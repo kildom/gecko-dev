@@ -13514,3 +13514,9 @@ bool InitModuleLoader(JSContext* cx, const OptionParser& op) {
 
   return true;
 }
+
+#include <pthread.h>
+
+pthread_t pthread_self(void) {
+  return (pthread_t)0;
+}

@@ -1106,10 +1106,10 @@ static bool WalkTheStackEnabled() {
 
 MFBT_API void MozWalkTheStack(FILE* aStream, const void* aFirstFramePC,
                               uint32_t aMaxFrames) {
-  if (WalkTheStackEnabled()) {
+  /*if (WalkTheStackEnabled()) {
     MozStackWalk(PrintStackFrame, aFirstFramePC ? aFirstFramePC : CallerPC(),
                  aMaxFrames, aStream);
-  }
+  }*/
 }
 
 static void WriteStackFrame(uint32_t aFrameNumber, void* aPC, void* aSP,
@@ -1123,8 +1123,8 @@ static void WriteStackFrame(uint32_t aFrameNumber, void* aPC, void* aSP,
 MFBT_API void MozWalkTheStackWithWriter(void (*aWriter)(const char*),
                                         const void* aFirstFramePC,
                                         uint32_t aMaxFrames) {
-  if (WalkTheStackEnabled()) {
+  /*if (WalkTheStackEnabled()) {
     MozStackWalk(WriteStackFrame, aFirstFramePC ? aFirstFramePC : CallerPC(),
                  aMaxFrames, (void*)aWriter);
-  }
+  }*/
 }
