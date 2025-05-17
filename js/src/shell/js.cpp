@@ -13521,6 +13521,14 @@ pthread_t pthread_self(void) {
   return (pthread_t)0;
 }
 
-void checkAggressiveGC(uint32_t heapBytes) {
-  (void)heapBytes;
+uint32_t checkGreedyGC() {
+  return 0x80000000;
+}
+
+void* sboxAlloc(uint32_t alignment, uint32_t size) {
+  return nullptr;
+}
+
+bool sboxFree(void* ptr) {
+  return false;
 }

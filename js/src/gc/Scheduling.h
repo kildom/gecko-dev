@@ -611,6 +611,8 @@ struct TriggerResult {
 
 using AtomicByteCount = mozilla::Atomic<size_t, mozilla::ReleaseAcquire>;
 
+extern uint32_t trackedZoneBytes;
+
 /*
  * Tracks the size of allocated data. This is used for both GC and malloc data.
  * It automatically maintains the memory usage relationship between parent and
@@ -636,8 +638,10 @@ class HeapSize {
    */
   AtomicByteCount retainedBytes_;
 
+  bool tracked;
+
  public:
-  explicit HeapSize() {
+  explicit HeapSize(bool tracked = false): tracked(tracked) {
     MOZ_ASSERT(bytes_ == 0);
     MOZ_ASSERT(retainedBytes_ == 0);
   }
@@ -659,6 +663,7 @@ class HeapSize {
     mozilla::DebugOnly<size_t> initialBytes(bytes_);
     MOZ_ASSERT(initialBytes + nbytes > initialBytes);
     bytes_ += nbytes;
+    if (tracked) trackedZoneBytes += nbytes;
   }
   void removeBytes(size_t nbytes, bool updateRetainedSize) {
     if (updateRetainedSize) {
@@ -667,6 +672,7 @@ class HeapSize {
     }
     MOZ_ASSERT(bytes_ >= nbytes);
     bytes_ -= nbytes;
+    if (tracked) trackedZoneBytes -= nbytes;
   }
 };
 
@@ -676,6 +682,7 @@ class HeapSize {
  */
 class HeapSizeChild : public HeapSize {
  public:
+  HeapSizeChild(bool tracked = false) : HeapSize(tracked) {}
   void addGCArena(HeapSize& parent) {
     HeapSize::addGCArena();
     parent.addGCArena();
@@ -699,6 +706,7 @@ class HeapSizeChild : public HeapSize {
 
 class PerZoneGCHeapSize : public HeapSizeChild {
  public:
+  PerZoneGCHeapSize(bool tracked = false) : HeapSizeChild(tracked) {}
   size_t freedBytes() const { return freedBytes_; }
   void clearFreedBytes() { freedBytes_ = 0; }
 

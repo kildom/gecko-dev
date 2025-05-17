@@ -120,6 +120,4 @@ static_assert(sizeof(void*) == 8 ? JS_BITS_PER_WORD == 64
 #define JS_FUNC_TO_DATA_PTR(type, fun) (mozilla::BitwiseCast<type>(fun))
 #define JS_DATA_TO_FUNC_PTR(type, ptr) (mozilla::BitwiseCast<type>(ptr))
 
-void checkAggressiveGC(uint32_t heapBytes);
-
 #endif /* jstypes_h */

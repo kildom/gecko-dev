@@ -888,3 +888,9 @@ inline void MemoryTracker::Hasher<Ptr>::rekey(KeyT& k, const KeyT& newKey) {
 }
 
 #endif  // DEBUG
+
+namespace js {
+  namespace gc {
+    uint32_t trackedZoneBytes = 0;
+  }
+}

@@ -36,6 +36,35 @@
 
 #endif  // !XP_WIN
 
+#if defined(__wasi__)
+
+/* SpiderMonkey uses this file to allocate mostly 1MB chunks of memory with 1MB of alignment.
+ * The dlmalloc allocator implementation from wasilibc generates a lot of fragmentation
+ * when allocating with big alignment. It uses almost two times more memory than requested.
+ * The gaps can be filled with smaller unaligned allocation, but it is not enough to overcome
+ * this problem.
+ *
+ * The following definitions allows to use a different allocator designed for this purpose.
+ * If it fails, the system allocator (dlmalloc) is used.
+ */
+
+static_assert(js::gc::ChunkSize == 1024 * 1024,
+  "Alterative allocator is designed for 1MB chunks only.");
+
+/*
+ * Allocates `size` bytes of memory aligned to `alignment`.
+ * Returns nullptr on failure or when provided parameters are not supported.
+ */
+void* sboxAlloc(uint32_t alignment, uint32_t size);
+
+/*
+ * Frees memory allocated by sboxAlloc.
+ * Returns false if the pointer was not allocated by sboxAlloc.
+ */
+bool sboxFree(void* ptr);
+
+#endif // __wasi__
+
 namespace js::gc {
 
 /*
@@ -195,9 +224,12 @@ static inline void* MapInternal(void* desired, size_t length) {
       (commit == Commit::Yes ? MEM_RESERVE | MEM_COMMIT : MEM_RESERVE);
   region = VirtualAlloc(desired, length, flags, DWORD(prot));
 #elif defined(__wasi__)
-  if (int err = posix_memalign(&region, gc::SystemPageSize(), length)) {
-    MOZ_RELEASE_ASSERT(err == ENOMEM);
-    return nullptr;
+  region = sboxAlloc(gc::SystemPageSize(), length);
+  if (!region) {
+    if (int err = posix_memalign(&region, gc::SystemPageSize(), length)) {
+      MOZ_RELEASE_ASSERT(err == ENOMEM);
+      return nullptr;
+    }
   }
   if (region) {
     memset(region, 0, length);
@@ -220,7 +252,9 @@ static inline void UnmapInternal(void* region, size_t length) {
 #ifdef XP_WIN
   MOZ_RELEASE_ASSERT(VirtualFree(region, 0, MEM_RELEASE) != 0);
 #elif defined(__wasi__)
-  free(region);
+  if (!sboxFree(region)) {
+    free(region);
+  }
 #else
   if (munmap(region, length)) {
     MOZ_RELEASE_ASSERT(errno == ENOMEM);
@@ -434,11 +468,13 @@ void* MapAlignedPages(size_t length, size_t alignment) {
   }
 
 #ifdef __wasi__
-  void* region = nullptr;
-  if (int err = posix_memalign(&region, alignment, length)) {
-    MOZ_ASSERT(err == ENOMEM);
-    (void)err;
-    return nullptr;
+  void* region = sboxAlloc(alignment, length);
+  if (!region) {
+    if (int err = posix_memalign(&region, alignment, length)) {
+      MOZ_ASSERT(err == ENOMEM);
+      (void)err;
+      return nullptr;
+    }
   }
   MOZ_ASSERT(region != nullptr);
   memset(region, 0, length);
